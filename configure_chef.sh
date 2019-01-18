@@ -1,7 +1,13 @@
 #!/bin/bash
 
 # Create chef-server.rb with variables
-echo "nginx['enable_non_ssl']=false" > /etc/opscode/chef-server.rb
+if [[ -z $ENABLE_NON_SSL ]]; then
+  echo "nginx['enable_non_ssl']=false" > /etc/opscode/chef-server.rb
+  # sed "100a node.default['private_chef']['nginx']['enable_non_ssl']=false" /opt/opscode/embedded/cookbooks/private-chef/recipes/nginx.rb > /opt/opscode/embedded/cookbooks/private-chef/recipes/nginx.rb
+else
+  echo "nginx['enable_non_ssl']=$ENABLE_NON_SSL" > /etc/opscode/chef-server.rb
+  # sed "100a node.default['private_chef']['nginx']['enable_non_ssl']=$ENABLE_NON_SSL" /opt/opscode/embedded/cookbooks/private-chef/recipes/nginx.rb > /opt/opscode/embedded/cookbooks/private-chef/recipes/nginx.rb
+fi
 
 if [[ -z $SSL_PORT ]]; then
   echo "nginx['ssl_port']=443" >> /etc/opscode/chef-server.rb
@@ -56,8 +62,15 @@ chef-server-ctl user-create admin Admin User admin@myorg.com "passwd"  --filenam
 chef-server-ctl org-create my_org "Default organization" --association_user admin --filename /etc/chef/my_org-validator.pem
 echo -e "\nRunning: 'chef-server-ctl install chef-manage'"...
 chef-server-ctl install chef-manage
+echo -e "\nRunning: 'chef-server-ctl install opscode-reporting'"...
+chef-server-ctl install opscode-reporting
 echo -e "\nRunning: 'chef-server-ctl reconfigure'"...
 chef-server-ctl reconfigure
+echo -e "\nRunning: 'chef-manage-ctl reconfigure'"...
+chef-manage-ctl reconfigure --accept-license
+echo -e "\nRunning: 'opscode-reporting-ctl reconfigure'"...
+opscode-reporting-ctl reconfigure --accept-license
+
 echo "{ \"error\": \"Please use https:// instead of http:// !\" }" > /var/opt/opscode/nginx/html/500.json
 sed -i "s,/503.json;,/503.json;\n    error_page 497 =503 /500.json;,g" /var/opt/opscode/nginx/etc/chef_https_lb.conf
 sed -i '$i\    location /knife_admin_key.tar.gz {\n      default_type application/zip;\n      alias /etc/chef/knife_admin_key.tar.gz;\n    }' /var/opt/opscode/nginx/etc/chef_https_lb.conf
